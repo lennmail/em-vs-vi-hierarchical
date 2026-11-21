@@ -31,7 +31,7 @@ class Priors:
     mu_naught: float = 0.0
 
     @classmethod
-    def from_config(cls, variances: dict, hyperpriors: dict) -> "Priors":
+    def from_config(cls, variances: dict, hyperpriors: dict) -> Priors:
         return cls(
             sigma2=float(variances["sigma2"]),
             tau2=float(variances["tau2"]),
@@ -87,11 +87,11 @@ class EMKnownGroups:
         xbar = X.mean(axis=0)
 
         mu = float(rng.normal(p.mu_naught, np.sqrt(p.tau_naught2)))
-        theta = rng.normal(mu, np.sqrt(p.tau2), K)
+        theta = np.asarray(rng.normal(mu, np.sqrt(p.tau2), size=K))
         history = [self.log_posterior(X, theta, mu)]
         converged = False
 
-        for it in range(1, self.max_iter + 1):
+        for _ in range(self.max_iter):
             theta = (n * p.tau2 * xbar + p.sigma2 * mu) / (n * p.tau2 + p.sigma2)
             mu = float((p.tau_naught2 * theta.sum() + p.tau2 * p.mu_naught) / (K * p.tau_naught2 + p.tau2))
             history.append(self.log_posterior(X, theta, mu))
@@ -101,7 +101,14 @@ class EMKnownGroups:
 
         if not converged:
             warnings.warn(f"EMKnownGroups did not converge in {self.max_iter} iterations.", stacklevel=2)
-        return EMResult(theta=theta, mu=mu, weights=None, log_posterior=history, iterations=it, converged=converged)
+        return EMResult(
+            theta=theta,
+            mu=mu,
+            weights=None,
+            log_posterior=history,
+            iterations=len(history) - 1,
+            converged=converged,
+        )
 
 
 class EMMixture:
@@ -178,14 +185,21 @@ class EMMixture:
         history = [self.log_posterior(x, theta, mu, weights)]
         converged = False
 
-        for it in range(1, self.max_iter + 1):
+        for _ in range(self.max_iter):
             gamma = self._e_step(x, theta, weights)
             theta, mu, weights = self._m_step(x, gamma)
             history.append(self.log_posterior(x, theta, mu, weights))
             if abs(history[-1] - history[-2]) < self.tol:
                 converged = True
                 break
-        return EMResult(theta=theta, mu=mu, weights=weights, log_posterior=history, iterations=it, converged=converged)
+        return EMResult(
+            theta=theta,
+            mu=mu,
+            weights=weights,
+            log_posterior=history,
+            iterations=len(history) - 1,
+            converged=converged,
+        )
 
     def fit(self, x: np.ndarray, rng: np.random.Generator | None = None) -> EMResult:
         """Run EM ``n_init`` times from random starts and keep the best run."""

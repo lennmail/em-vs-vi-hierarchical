@@ -58,6 +58,7 @@ means.
 ```bash
 uv sync
 uv run pytest                                          # quick correctness checks
+uv run pre-commit install                              # ruff, mypy and basic file checks on commit
 uv run scripts/run_simulations.py --method em          # ~1 min
 uv run scripts/run_simulations.py --method vi          # hours; add --quick for a smoke test
 uv run scripts/make_figures.py                         # -> figures/

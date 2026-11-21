@@ -13,8 +13,8 @@ shuffled 1-D sample from a Gaussian mixture.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 
 import numpy as np
 
@@ -84,6 +84,6 @@ def sample_mixture(
 
     mu = _draw_mu(rng, mu, mu_naught, tau_naught2)
     theta = rng.normal(mu, np.sqrt(tau2), num_groups)
-    X = np.concatenate([rng.normal(t, np.sqrt(sigma2), c) for t, c in zip(theta, counts)])
+    X = np.concatenate([rng.normal(t, np.sqrt(sigma2), c) for t, c in zip(theta, counts, strict=False)])
     rng.shuffle(X)
     return MixtureSample(X=X, theta=theta, mu=mu, weights=counts / counts.sum())

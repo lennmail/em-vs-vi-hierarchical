@@ -1,8 +1,8 @@
 """Run the simulation study.
 
-    uv run scripts/run_simulations.py --method em
-    uv run scripts/run_simulations.py --method vi              # slow (hours)
-    uv run scripts/run_simulations.py --method vi --quick      # smoke test
+uv run scripts/run_simulations.py --method em
+uv run scripts/run_simulations.py --method vi              # slow (hours)
+uv run scripts/run_simulations.py --method vi --quick      # smoke test
 """
 
 import argparse

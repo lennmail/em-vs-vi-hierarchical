@@ -35,7 +35,7 @@ def mse_boxplots(name, xlabel):
     if not panels:
         return
     fig, axes = plt.subplots(1, len(panels), figsize=(7 * len(panels), 5), sharey=True, squeeze=False)
-    for ax, (title, res) in zip(axes[0], panels):
+    for ax, (title, res) in zip(axes[0], panels, strict=False):
         sns.boxplot(data=mse_frame(res), x="setting", y="MSE", hue="Parameter", ax=ax)
         ax.set(title=title, xlabel=xlabel, yscale="log")
         ax.grid(True, alpha=0.3)

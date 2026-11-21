@@ -31,14 +31,33 @@ def _rngs(seed, scenario, model, setting_idx, rep):
     return np.random.default_rng(data_ss), np.random.default_rng(fit_ss)
 
 
-def _match_labels(theta_true, theta_est, w_true, w_est):
-    """Mixture components are only identified up to permutation: match them
-    by sorting true and estimated means separately."""
-    i, j = np.argsort(theta_true), np.argsort(theta_est)
-    return theta_true[i], theta_est[j], w_true[i], (w_est[j] if w_est is not None else None)
+def _fit(
+    method: str, model: str, data: np.ndarray, priors: Priors, K: int, cfg: dict, rng: np.random.Generator
+) -> tuple[np.ndarray, float, np.ndarray | None, int, list[float]]:
+    """Fit one data set; return (theta, mu, weights, iterations, trace)."""
+    if method == "em":
+        em = cfg["em"]
+        if model == "known":
+            r = EMKnownGroups(priors, em["max_iter"], em["tol"]).fit(data, rng)
+        else:
+            r = EMMixture(priors, K, **em).fit(data, rng)
+        return np.asarray(r.theta), r.mu, r.weights, r.iterations, r.log_posterior
+
+    from .vi import build_known_groups_model, build_mixture_model, fit_advi
+
+    vi = cfg["vi"]
+    if model == "known":
+        pm_model, max_iter = build_known_groups_model(data, priors), vi["max_iter_known"]
+    else:
+        pm_model, max_iter = build_mixture_model(data, priors, K), vi["max_iter_mixture"]
+    v = fit_advi(
+        pm_model, max_iter=max_iter, tol=vi["tol"], n_samples=vi["n_samples"], seed=int(rng.integers(2**31))
+    )
+    trace = [float(e) for e in v.elbo[:: cfg["trace_thin"]]]
+    return np.asarray(v.theta), v.mu, v.weights, v.iterations, trace
 
 
-def run_setting(method, scenario, model, setting_idx, setting, cfg) -> dict:
+def run_setting(method: str, scenario: str, model: str, setting_idx: int, setting: dict, cfg: dict) -> dict:
     priors = Priors.from_config(setting["variances"], setting["hyperpriors"])
     K = setting["num_groups"]
     gen_kwargs = dict(
@@ -48,50 +67,51 @@ def run_setting(method, scenario, model, setting_idx, setting, cfg) -> dict:
         **setting["variances"],
         **setting["hyperpriors"],
     )
-    thin = cfg["trace_thin"]
-    out = {k: [] for k in ["true_theta", "est_theta", "true_mu", "est_mu", "theta_mse", "mu_mse",
-                           "true_weights", "est_weights", "weights_mse", "iterations", "trace"]}
+    out: dict[str, list] = {
+        k: []
+        for k in [
+            "true_theta",
+            "est_theta",
+            "true_mu",
+            "est_mu",
+            "theta_mse",
+            "mu_mse",
+            "true_weights",
+            "est_weights",
+            "weights_mse",
+            "iterations",
+            "trace",
+        ]
+    }
 
     for rep in range(cfg["num_sims"]):
         data_rng, fit_rng = _rngs(cfg["seed"], scenario, model, setting_idx, rep)
         if model == "known":
-            sample = sample_known_groups(data_rng, **gen_kwargs)
-            data, w_true = sample.X, None
+            known = sample_known_groups(data_rng, **gen_kwargs)
+            data, theta_true, mu_true = known.X, known.theta, known.mu
         else:
-            sample = sample_mixture(data_rng, **gen_kwargs)
-            data, w_true = sample.X, sample.weights
+            mix = sample_mixture(data_rng, **gen_kwargs)
+            data, theta_true, mu_true = mix.X, mix.theta, mix.mu
 
-        if method == "em":
-            est = (EMKnownGroups(priors, cfg["em"]["max_iter"], cfg["em"]["tol"]) if model == "known"
-                   else EMMixture(priors, K, **cfg["em"])).fit(data, fit_rng)
-            trace = est.log_posterior
-        else:
-            from .vi import build_known_groups_model, build_mixture_model, fit_advi
+        theta_est, mu_est, w_est, iterations, trace = _fit(method, model, data, priors, K, cfg, fit_rng)
 
-            vi = cfg["vi"]
-            if model == "known":
-                pm_model, max_iter = build_known_groups_model(data, priors), vi["max_iter_known"]
-            else:
-                pm_model, max_iter = build_mixture_model(data, priors, K), vi["max_iter_mixture"]
-            est = fit_advi(pm_model, max_iter=max_iter, tol=vi["tol"], n_samples=vi["n_samples"],
-                           seed=int(fit_rng.integers(2**31)))
-            trace = est.elbo[::thin]
-
-        theta_true, theta_est, w_est = sample.theta, np.asarray(est.theta), est.weights
         if model == "mixture":
-            theta_true, theta_est, w_true, w_est = _match_labels(theta_true, theta_est, w_true, w_est)
-
-        out["true_theta"].append(theta_true.tolist())
-        out["est_theta"].append(theta_est.tolist())
-        out["true_mu"].append(sample.mu)
-        out["est_mu"].append(float(est.mu))
-        out["theta_mse"].append(float(np.mean((theta_true - theta_est) ** 2)))
-        out["mu_mse"].append(float((sample.mu - est.mu) ** 2))
-        if model == "mixture":
+            # Components are only identified up to permutation: match them by
+            # sorting true and estimated means separately.
+            assert w_est is not None
+            i, j = np.argsort(theta_true), np.argsort(theta_est)
+            theta_true, theta_est, w_true, w_est = theta_true[i], theta_est[j], mix.weights[i], w_est[j]
             out["true_weights"].append(w_true.tolist())
             out["est_weights"].append(w_est.tolist())
             out["weights_mse"].append(float(np.mean((w_true - w_est) ** 2)))
-        out["iterations"].append(int(est.iterations))
+
+        out["true_theta"].append(theta_true.tolist())
+        out["est_theta"].append(theta_est.tolist())
+        out["true_mu"].append(mu_true)
+        out["est_mu"].append(float(mu_est))
+        out["theta_mse"].append(float(np.mean((theta_true - theta_est) ** 2)))
+        out["mu_mse"].append(float((mu_true - mu_est) ** 2))
+        out["iterations"].append(int(iterations))
         out["trace"].append([float(v) for v in trace])
     return out
 
@@ -105,10 +125,12 @@ def run(method: str, cfg: dict, out_dir: Path, scenarios=None, workers: int | No
         for model in scenario["models"]:
             print(f"[{method}] {name} / {model} ...", flush=True)
             labels = list(scenario["settings"])
-            jobs = [(method, name, model, i, resolve_setting(scenario, scenario["settings"][lab]), cfg)
-                    for i, lab in enumerate(labels)]
+            jobs = [
+                (method, name, model, i, resolve_setting(scenario, scenario["settings"][lab]), cfg)
+                for i, lab in enumerate(labels)
+            ]
             with ProcessPoolExecutor(max_workers=workers) as ex:
-                results = list(ex.map(run_setting, *zip(*jobs)))
+                results = list(ex.map(run_setting, *zip(*jobs, strict=False)))
             path = out_dir / f"{name}_{model}.json"
-            path.write_text(json.dumps(dict(zip(labels, results))))
+            path.write_text(json.dumps(dict(zip(labels, results, strict=False))))
             print(f"    -> {path}")
