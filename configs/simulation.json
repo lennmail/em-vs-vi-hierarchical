@@ -1,0 +1,84 @@
+{
+    "seed": 69,
+    "num_sims": 100,
+
+    "em": {"max_iter": 1000, "tol": 1e-4, "n_init": 1},
+    "vi": {
+        "max_iter_known": 15000,
+        "max_iter_mixture": 75000,
+        "tol": 1e-7,
+        "n_samples": 2000
+    },
+    "trace_thin": 25,
+
+    "scenarios": {
+        "sample_size": {
+            "description": "Vary the number of observations per group.",
+            "xlabel": "Total sample size",
+            "models": ["known", "mixture"],
+            "defaults": {
+                "num_groups": 5,
+                "variances": {"sigma2": 1.0, "tau2": 1.0, "tau_naught2": 1.0},
+                "hyperpriors": {"mu_naught": 0.0},
+                "true_mu": null
+            },
+            "settings": {
+                "50":   {"num_obs_per_group": 10},
+                "250":  {"num_obs_per_group": 50},
+                "500":  {"num_obs_per_group": 100},
+                "1250": {"num_obs_per_group": 250}
+            }
+        },
+
+        "group_sizes": {
+            "description": "Vary how 1000 observations are split across 5 groups (unknown groups only).",
+            "xlabel": "Group sizes",
+            "models": ["mixture"],
+            "defaults": {
+                "num_groups": 5,
+                "variances": {"sigma2": 1.0, "tau2": 1.0, "tau_naught2": 1.0},
+                "hyperpriors": {"mu_naught": 0.0},
+                "true_mu": null
+            },
+            "settings": {
+                "balanced":  {"num_obs_per_group": [200, 200, 200, 200, 200]},
+                "one large": {"num_obs_per_group": [100, 100, 100, 100, 600]},
+                "one empty": {"num_obs_per_group": [0, 250, 250, 250, 250]}
+            }
+        },
+
+        "number_of_groups": {
+            "description": "Vary the number of groups at a fixed total of 1000 observations.",
+            "xlabel": "Number of groups",
+            "models": ["known", "mixture"],
+            "defaults": {
+                "variances": {"sigma2": 1.0, "tau2": 10.0, "tau_naught2": 1.0},
+                "hyperpriors": {"mu_naught": 0.0},
+                "true_mu": null
+            },
+            "settings": {
+                "1":  {"num_groups": 1,  "num_obs_per_group": 1000},
+                "3":  {"num_groups": 3,  "num_obs_per_group": 333},
+                "5":  {"num_groups": 5,  "num_obs_per_group": 200},
+                "10": {"num_groups": 10, "num_obs_per_group": 100}
+            }
+        },
+
+        "hyperprior": {
+            "description": "Fix the true mu = 0 and vary the hyperprior (well-specified, vague and off-centre, tight and off-centre).",
+            "xlabel": "Hyperprior",
+            "models": ["known", "mixture"],
+            "defaults": {
+                "num_groups": 5,
+                "num_obs_per_group": 200,
+                "variances": {"sigma2": 1.0, "tau2": 1.0, "tau_naught2": 1.0},
+                "true_mu": 0.0
+            },
+            "settings": {
+                "N(0, 1)":    {"hyperpriors": {"mu_naught": 0.0}},
+                "N(10, 1000)": {"hyperpriors": {"mu_naught": 10.0}, "variances": {"sigma2": 1.0, "tau2": 1.0, "tau_naught2": 1000.0}},
+                "N(10, 1)":   {"hyperpriors": {"mu_naught": 10.0}}
+            }
+        }
+    }
+}

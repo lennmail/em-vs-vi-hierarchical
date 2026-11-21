@@ -1,0 +1,23 @@
+[project]
+name = "emvi"
+version = "1.0.0"
+description = "EM vs. variational inference for Bayesian hierarchical models"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "scipy",
+    "pymc>=5",
+    "matplotlib",
+    "seaborn",
+    "pandas",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

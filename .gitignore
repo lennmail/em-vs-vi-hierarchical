@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.venv/
+.DS_Store
+.pytest_cache/
+
+# simulation outputs (regenerate with scripts/)
+results/
+figures/
+
+# local only
+report/
