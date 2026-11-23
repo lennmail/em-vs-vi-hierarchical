@@ -4,9 +4,8 @@ __pycache__/
 .DS_Store
 .pytest_cache/
 
-# simulation outputs (regenerate with scripts/)
+# raw simulation output (regenerate with scripts/run_simulations.py)
 results/
-figures/
 
 # local only
 report/

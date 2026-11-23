@@ -44,6 +44,9 @@ x_i     ~ N(θ_{z_i}, σ²)               (observations)
 * *Model 2:* ADVI cannot handle discrete latent variables. So the labels are
   marginalised out, the weights get a flat `Dirichlet(1)` prior, and the likelihood is
   `Σ_k π_k N(x | θ_k, σ²)`.
+* Optimised with Adam (learning rate 0.01) for a fixed number of iterations, starting
+  from the same point as EM (data mean for `μ`, group means or random data points for
+  `θ`). PyMC's default step size is too small to move far from the start.
 * Estimates are posterior means of the fitted approximation. Because the posterior of
   model 1 is Gaussian, VI and EM should give (almost) the same answer there.
 
@@ -64,7 +67,8 @@ uv run scripts/run_simulations.py --method vi          # hours; add --quick for 
 uv run scripts/make_figures.py                         # -> figures/
 ```
 
-Results go to `results/` and figures to `figures/`. Neither is committed.
+Raw results go to `results/` (not committed). The figures from the full run are in
+[`figures/`](figures/).
 
 ## Note for macOS
 

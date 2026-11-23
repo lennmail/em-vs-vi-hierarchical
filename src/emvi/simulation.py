@@ -7,6 +7,7 @@ so EM and VI see exactly the same data sets even when run separately.
 from __future__ import annotations
 
 import json
+import time
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
@@ -45,13 +46,22 @@ def _fit(
 
     from .vi import build_known_groups_model, build_mixture_model, fit_advi
 
+    # Start q where EM starts, so both methods get the same initial values: for the mixture
+    # the first draw from ``rng`` picks the same random data points as EMMixture.
     vi = cfg["vi"]
     if model == "known":
         pm_model, max_iter = build_known_groups_model(data, priors), vi["max_iter_known"]
+        start = {"theta": data.mean(axis=0), "mu": float(data.mean())}
     else:
         pm_model, max_iter = build_mixture_model(data, priors, K), vi["max_iter_mixture"]
+        start = {"theta": rng.choice(data, size=K, replace=len(data) < K), "mu": float(data.mean())}
     v = fit_advi(
-        pm_model, max_iter=max_iter, tol=vi["tol"], n_samples=vi["n_samples"], seed=int(rng.integers(2**31))
+        pm_model,
+        max_iter=max_iter,
+        learning_rate=vi["learning_rate"],
+        start=start,
+        n_samples=vi["n_samples"],
+        seed=int(rng.integers(2**31)),
     )
     trace = [float(e) for e in v.elbo[:: cfg["trace_thin"]]]
     return np.asarray(v.theta), v.mu, v.weights, v.iterations, trace
@@ -80,6 +90,7 @@ def run_setting(method: str, scenario: str, model: str, setting_idx: int, settin
             "est_weights",
             "weights_mse",
             "iterations",
+            "seconds",
             "trace",
         ]
     }
@@ -93,7 +104,9 @@ def run_setting(method: str, scenario: str, model: str, setting_idx: int, settin
             mix = sample_mixture(data_rng, **gen_kwargs)
             data, theta_true, mu_true = mix.X, mix.theta, mix.mu
 
+        start = time.perf_counter()
         theta_est, mu_est, w_est, iterations, trace = _fit(method, model, data, priors, K, cfg, fit_rng)
+        seconds = time.perf_counter() - start
 
         if model == "mixture":
             # Components are only identified up to permutation: match them by
@@ -112,6 +125,7 @@ def run_setting(method: str, scenario: str, model: str, setting_idx: int, settin
         out["theta_mse"].append(float(np.mean((theta_true - theta_est) ** 2)))
         out["mu_mse"].append(float((mu_true - mu_est) ** 2))
         out["iterations"].append(int(iterations))
+        out["seconds"].append(seconds)
         out["trace"].append([float(v) for v in trace])
     return out
 

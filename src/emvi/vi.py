@@ -6,7 +6,6 @@ from dataclasses import dataclass
 
 import numpy as np
 import pymc as pm
-from pymc.variational.callbacks import CheckParametersConvergence
 
 from .em import Priors
 
@@ -51,19 +50,28 @@ def build_mixture_model(x: np.ndarray, priors: Priors, num_groups: int) -> pm.Mo
 def fit_advi(
     model: pm.Model,
     max_iter: int = 15_000,
-    tol: float = 1e-7,
+    learning_rate: float = 0.01,
+    start: dict | None = None,
     n_samples: int = 2_000,
     seed: int | None = None,
     progressbar: bool = False,
 ) -> VIResult:
-    """Fit mean-field ADVI and summarise the approximate posterior by its mean."""
+    """Fit mean-field ADVI and summarise the approximate posterior by its mean.
+
+    ADVI runs for a fixed number of Adam steps. PyMC's default optimiser takes steps of
+    roughly 1e-3 per iteration, which is too slow when the starting point is far from the
+    posterior. ``start`` sets the initial means of q (in the original parameter space); for
+    a mixture, distinct starting values are essential, otherwise all components receive
+    identical gradients and never separate.
+    """
     with model:
         approx = pm.fit(
             n=max_iter,
             method="advi",
+            start=start,
+            obj_optimizer=pm.adam(learning_rate=learning_rate),
             random_seed=seed,
             progressbar=progressbar,
-            callbacks=[CheckParametersConvergence(diff="absolute", tolerance=tol)],
         )
         idata = approx.sample(n_samples, random_seed=seed)
 

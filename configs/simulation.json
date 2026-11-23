@@ -5,8 +5,8 @@
     "em": {"max_iter": 1000, "tol": 1e-4, "n_init": 1},
     "vi": {
         "max_iter_known": 15000,
-        "max_iter_mixture": 75000,
-        "tol": 1e-7,
+        "max_iter_mixture": 30000,
+        "learning_rate": 0.01,
         "n_samples": 2000
     },
     "trace_thin": 25,
